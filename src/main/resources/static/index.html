@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <title>CRUD em SPRING</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        :root { font-family: system-ui, Arial, sans-serif; }
+        body { margin: 24px; background: #f9fafb; }
+        h1 { margin-bottom: 8px; }
+        .grid { display: grid; grid-template-columns: repeat(6, minmax(140px, 1fr)); gap: 12px; }
+        label { display: flex; flex-direction: column; font-size: 14px; gap: 6px; }
+        input { padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
+        .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+        button { padding: 10px 14px; border: 0; border-radius: 10px; cursor: pointer; }
+        button.primary { background: #2563eb; color: white; }
+        button.secondary { background: #e5e7eb; }
+        button.danger { background: #ef4444; color: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; background: white; border-radius: 12px; overflow: hidden; }
+        th { background: #2563eb; color: white; text-align: left; padding: 10px; }
+        td { border-bottom: 1px solid #eee; padding: 10px; font-size: 14px; }
+        .muted { color: #666; font-size: 13px; }
+        .card { background: white; border: 1px solid #eee; border-radius: 12px; padding: 16px; margin-top: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+<h1>📚 CRUD de Livros</h1>
+
+<div class="card">
+    <h2>Cadastrar / Editar</h2>
+    <input type="hidden" id="id" />
+
+    <div class="grid">
+        <label>Título <input id="titulo" /></label>
+        <label>Autor <input id="autor" /></label>
+        <label>Ano <input id="ano" type="number" /></label>
+        <label>Gênero <input id="genero" /></label>
+        <label>Editora <input id="editora" /></label>
+        <label>Páginas <input id="numeroPaginas" type="number" /></label>
+    </div>
+
+    <div class="row">
+        <button class="primary" id="btnSalvar">Salvar</button>
+        <button class="secondary" id="btnLimpar">Limpar</button>
+        <span class="muted" id="status"></span>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Buscar</h2>
+    <div class="row">
+        <input id="buscaNome" placeholder="Buscar por título ou autor..." style="flex:1; min-width:200px;">
+        <button id="btnBuscarNome">Buscar Nome</button>
+    </div>
+    <div class="row">
+        <input id="buscaId" type="number" placeholder="Buscar por ID" style="flex:1; min-width:200px;">
+        <button id="btnBuscarId">Buscar ID</button>
+    </div>
+    <div class="row">
+        <button class="secondary" id="btnRecarregar">Recarregar todos</button>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Listagem</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th><th>Título</th><th>Autor</th><th>Ano</th>
+            <th>Gênero</th><th>Editora</th><th>Pág.</th><th>Ações</th>
+        </tr>
+        </thead>
+        <tbody id="tabela"></tbody>
+    </table>
+</div>
+
+<script>
+    const API = "http://localhost:8082/livro";
+
+    function getFormData(){
+      return {
+        titulo: document.getElementById('titulo').value.trim(),
+        autor: document.getElementById('autor').value.trim(),
+        ano: parseInt(document.getElementById('ano').value) || null,
+        genero: document.getElementById('genero').value.trim(),
+        editora: document.getElementById('editora').value.trim(),
+        numeroPaginas: parseInt(document.getElementById('numeroPaginas').value) || null
+      };
+    }
+
+    function setStatus(msg, ok=true){
+      const s = document.getElementById('status');
+      s.textContent = msg || '';
+      s.style.color = ok ? "green" : "red";
+    }
+
+    function limparForm(){
+      document.getElementById('id').value = "";
+      document.getElementById('titulo').value = "";
+      document.getElementById('autor').value = "";
+      document.getElementById('ano').value = "";
+      document.getElementById('genero').value = "";
+      document.getElementById('editora').value = "";
+      document.getElementById('numeroPaginas').value = "";
+      setStatus("");
+    }
+
+    async function carregarTodos(){
+      const res = await fetch(API);
+      const data = await res.json();
+      preencherTabela(data);
+    }
+
+    function preencherTabela(lista){
+      const tbody = document.getElementById('tabela');
+      tbody.innerHTML = "";
+      (Array.isArray(lista) ? lista : [lista]).forEach(l => {
+        if(!l) return;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${l.id}</td>
+          <td>${l.titulo || ""}</td>
+          <td>${l.autor || ""}</td>
+          <td>${l.ano ?? ""}</td>
+          <td>${l.genero || ""}</td>
+          <td>${l.editora || ""}</td>
+          <td>${l.numeroPaginas ?? ""}</td>
+          <td>
+            <button onclick='editar(${JSON.stringify(l)})'>Editar</button>
+            <button class="danger" onclick='excluir(${l.id})'>Excluir</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function editar(l){
+      document.getElementById('id').value = l.id;
+      document.getElementById('titulo').value = l.titulo;
+      document.getElementById('autor').value = l.autor;
+      document.getElementById('ano').value = l.ano;
+      document.getElementById('genero').value = l.genero;
+      document.getElementById('editora').value = l.editora;
+      document.getElementById('numeroPaginas').value = l.numeroPaginas;
+      setStatus("Editando ID " + l.id);
+    }
+
+    async function excluir(id){
+      if(!confirm("Excluir livro ID " + id + "?")) return;
+      await fetch(`${API}/${id}`, { method:"DELETE" });
+      setStatus("Livro excluído!");
+      carregarTodos();
+    }
+
+    async function salvar(){
+      const id = document.getElementById('id').value;
+      const body = JSON.stringify(getFormData());
+      if(id){ // PUT
+        await fetch(`${API}/${id}`, {
+          method:"PUT",
+          headers: {"Content-Type":"application/json"},
+          body
+        });
+        setStatus("Livro atualizado!");
+      } else { // POST
+        await fetch(API, {
+          method:"POST",
+          headers: {"Content-Type":"application/json"},
+          body
+        });
+        setStatus("Livro criado!");
+      }
+      limparForm();
+      carregarTodos();
+    }
+
+
+    async function buscarNome(){
+      const termo = document.getElementById("buscaNome").value.trim();
+      if(!termo) { carregarTodos(); return; }
+      const res = await fetch(`${API}/busca?nome=${encodeURIComponent(termo)}`);
+      const data = await res.json();
+      preencherTabela(data);
+    }
+
+
+    async function buscarId(){
+      const id = document.getElementById("buscaId").value;
+      if(!id) return;
+      const res = await fetch(`${API}/${id}`);
+      if(res.ok){
+        const data = await res.json();
+        preencherTabela([data]);
+      } else {
+        setStatus("Livro não encontrado", false);
+        document.getElementById("tabela").innerHTML = "";
+      }
+    }
+
+    document.getElementById('btnSalvar').addEventListener('click', salvar);
+    document.getElementById('btnLimpar').addEventListener('click', limparForm);
+    document.getElementById('btnRecarregar').addEventListener('click', carregarTodos);
+    document.getElementById('btnBuscarNome').addEventListener('click', buscarNome);
+    document.getElementById('btnBuscarId').addEventListener('click', buscarId);
+
+    carregarTodos();
+</script>
+</body>
+</html>
